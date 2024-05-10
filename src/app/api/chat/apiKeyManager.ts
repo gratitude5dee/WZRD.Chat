@@ -17,27 +17,42 @@ export class ApiKeyManager {
     this._mode = mode;
   }
 
-  private getKeyStore(apiKeys: string) {
-    let store = this._cache.get(apiKeys);
+  private getKeyStore(apiKeyIdentifier: string): KeyStore {
+    let store = this._cache.get(apiKeyIdentifier);
 
     if (!store) {
-      const keys = apiKeys.split(',').filter((_) => !!_.trim());
+      console.error(`No keys found for API Key Identifier: ${apiKeyIdentifier}`);
+      throw new Error(`API keys are missing or malformed for ${apiKeyIdentifier}`);
+      const keys = apiKeyIdentifier.split(',').filter(key => !!key.trim());
+      store = { index: 0, keyLen: keys.length, keys };
+      this._cache.set(apiKeyIdentifier, store);
+    }
 
-      store = { index: 0, keyLen: keys.length, keys } as KeyStore;
-      this._cache.set(apiKeys, store);
+    if (store.keys.length === 0) {
+      console.error(`Malformed keys detected for ${apiKeyIdentifier}`);
+      throw new Error(`Every key is invalid or malformed in ${apiKeyIdentifier}`);
     }
 
     return store;
   }
 
-  pick(apiKeys: string = '') {
-    if (!apiKeys) return '';
+  pick(apiKeyIdentifier: string = ''): string {
+    if (!apiKeyIdentifier) return '';
 
-    const store = this.getKeyStore(apiKeys);
+    let store;
+    try {
+      store = this.getKeyStore(apiKeyIdentifier);
+    } catch (error) {
+      console.error(error.message);
+      return '';
+    }
     let index = 0;
 
-    if (this._mode === 'turn') index = store.index++ % store.keyLen;
-    if (this._mode === 'random') index = Math.floor(Math.random() * store.keyLen);
+    if (this._mode === 'turn') {
+      index = store.index++ % store.keyLen;
+    } else if (this._mode === 'random') {
+      index = Math.floor(Math.random() * store.keyLen);
+    }
 
     return store.keys[index];
   }
